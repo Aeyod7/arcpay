@@ -45,3 +45,5 @@ version.txt
 clerk_version.txt
 
 .vercel
+apps/api/prisma/client
+

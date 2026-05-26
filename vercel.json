@@ -7,9 +7,7 @@
       "config": {
         "includeFiles": [
           "apps/api/prisma/**",
-          "packages/sdk/dist/**",
-          "node_modules/.prisma/client/**",
-          "node_modules/@prisma/client/**"
+          "packages/sdk/dist/**"
         ]
       }
     }
