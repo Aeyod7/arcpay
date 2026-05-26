@@ -14,7 +14,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const res = await fetch('http://localhost:62650/api/settings');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/settings`);
         const data = await res.json();
         if (data.success) {
           setWebhookUrl(data.settings.webhookUrl || '');
@@ -33,7 +33,7 @@ export default function SettingsPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:62650/api/settings', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/settings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

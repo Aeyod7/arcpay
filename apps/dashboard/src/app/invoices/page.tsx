@@ -49,7 +49,7 @@ export default function InvoicesHistoryPage() {
   useEffect(() => {
     const fetchInvoices = async () => {
       try {
-        const res = await fetch('http://localhost:62650/api/invoices');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/invoices`);
         const data = await res.json();
         if (data.success) {
           setInvoices(data.invoices);

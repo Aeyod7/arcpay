@@ -5,7 +5,8 @@
   "main": "server.mjs",
   "scripts": {
     "dev": "node server.mjs",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "build": "npm run build --prefix ../.. --workspace=@arcpay/sdk && prisma generate"
   },
   "dependencies": {
     "express": "^4.19.2",

@@ -27,7 +27,7 @@ export default function CustomerPaymentGateway() {
     // Fetch dynamic invoice details
     const fetchDetails = async () => {
       try {
-        const response = await fetch(`http://localhost:62650/api/invoices/${invoiceId}`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/invoices/${invoiceId}`);
         const data = await response.json();
         if (data.success) {
           setInvoice(data.invoice);
@@ -65,7 +65,7 @@ export default function CustomerPaymentGateway() {
     
     try {
       // Notify express developer API of the dynamic settled invoice transaction
-      await fetch(`http://localhost:62650/api/invoices/${invoiceId}/pay`, {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/invoices/${invoiceId}/pay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

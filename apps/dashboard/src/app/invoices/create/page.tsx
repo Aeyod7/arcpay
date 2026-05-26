@@ -16,7 +16,7 @@ export default function CreateInvoicePage() {
     setLoading(true);
     try {
       // Direct post connection to express developer backend API
-      const response = await fetch('http://localhost:62650/api/invoices', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/invoices`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -36,7 +36,7 @@ export default function PayoutsPage() {
   useEffect(() => {
     const fetchPayouts = async () => {
       try {
-        const res = await fetch('http://localhost:62650/api/payouts');
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/payouts`);
         const data = await res.json();
         if (data.success) {
           setPayouts(data.payouts);
