@@ -4,6 +4,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from './prisma/client/index.js';
+import { Resend } from 'resend';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +12,179 @@ const __dirname = path.dirname(__filename);
 const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 62650;
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+// Premium Emerald HTML Invoice Request Email Template
+function getInvoiceEmailHTML(invoice) {
+  const checkoutUrl = `https://arcpay-app-two.vercel.app/invoices/pay/${invoice.id}`;
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Payment Request from ArcPay</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background-color: #faf9f9; color: #1a1c1c; }
+        .container { max-width: 600px; margin: 40px auto; padding: 32px; background-color: #ffffff; border: 1px solid #bfc9bd; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .header { text-align: center; margin-bottom: 32px; }
+        .logo { font-size: 24px; font-weight: bold; color: #004c22; letter-spacing: -0.5px; }
+        .title { font-size: 20px; font-weight: bold; margin: 16px 0 8px 0; color: #1a1c1c; }
+        .amount-card { background-color: #f0f7f2; border: 1px solid #bfc9bd; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; }
+        .amount-val { font-size: 32px; font-weight: 800; color: #004c22; font-family: monospace; }
+        .amount-lbl { font-size: 12px; color: #767d74; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; font-weight: 600; }
+        .details-list { border-top: 1px solid #bfc9bd; border-bottom: 1px solid #bfc9bd; padding: 16px 0; margin: 24px 0; }
+        .details-item { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+        .details-key { color: #767d74; }
+        .details-val { font-weight: 600; color: #1a1c1c; }
+        .btn { display: block; text-align: center; background-color: #004c22; color: #ffffff !important; text-decoration: none; padding: 16px 24px; border-radius: 8px; font-weight: bold; font-size: 16px; margin: 32px 0 16px 0; box-shadow: 0 2px 8px rgba(0,76,34,0.2); }
+        .footer { text-align: center; font-size: 12px; color: #767d74; margin-top: 32px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Arc Network</div>
+          <div class="title">New Invoice Request</div>
+          <p style="font-size: 14px; color: #767d74; margin: 4px 0 0 0;">An invoice has been generated for your settlement</p>
+        </div>
+        
+        <div class="amount-card">
+          <div class="amount-val">$${invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+          <div class="amount-lbl">USDC Settlement Total</div>
+        </div>
+        
+        <div class="details-list">
+          <div class="details-item">
+            <span class="details-key">Client Name</span>
+            <span class="details-val">${invoice.clientName}</span>
+          </div>
+          <div class="details-item">
+            <span class="details-key">Client Email</span>
+            <span class="details-val">${invoice.clientEmail}</span>
+          </div>
+          <div class="details-item">
+            <span class="details-key">Description</span>
+            <span class="details-val">${invoice.description}</span>
+          </div>
+          <div class="details-item">
+            <span class="details-key">Status</span>
+            <span class="details-val" style="color: #ba1a1a; text-transform: uppercase;">Pending Payment</span>
+          </div>
+        </div>
+        
+        <a href="${checkoutUrl}" class="btn">Proceed to Secure Blockchain Checkout</a>
+        
+        <div class="footer">
+          <p>Powered by ArcPay native zero-gas USDC engine. Transactions are fully secured on-chain.</p>
+          <p>© 2026 Arc Network Inc. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+// Premium Emerald HTML Receipt Email Template
+function getReceiptEmailHTML(invoice) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Payment Receipt from ArcPay</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background-color: #faf9f9; color: #1a1c1c; }
+        .container { max-width: 600px; margin: 40px auto; padding: 32px; background-color: #ffffff; border: 1px solid #bfc9bd; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .header { text-align: center; margin-bottom: 32px; }
+        .logo { font-size: 24px; font-weight: bold; color: #004c22; letter-spacing: -0.5px; }
+        .title { font-size: 20px; font-weight: bold; margin: 16px 0 8px 0; color: #004c22; }
+        .success-badge { display: inline-flex; align-items: center; background-color: #e0f2e5; color: #166534; font-weight: bold; font-size: 11px; padding: 4px 12px; border-radius: 100px; text-transform: uppercase; margin-bottom: 16px; }
+        .amount-card { background-color: #faf9f9; border: 1px solid #bfc9bd; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; }
+        .amount-val { font-size: 32px; font-weight: 800; color: #1a1c1c; font-family: monospace; }
+        .amount-lbl { font-size: 12px; color: #767d74; text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; font-weight: 600; }
+        .details-list { border-top: 1px solid #bfc9bd; border-bottom: 1px solid #bfc9bd; padding: 16px 0; margin: 24px 0; }
+        .details-item { display: flex; justify-content: space-between; margin: 8px 0; font-size: 14px; }
+        .details-key { color: #767d74; }
+        .details-val { font-weight: 600; color: #1a1c1c; }
+        .tx-link { display: block; font-family: monospace; font-size: 11px; color: #004c22; word-break: break-all; margin-top: 4px; text-decoration: none; }
+        .footer { text-align: center; font-size: 12px; color: #767d74; margin-top: 32px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">Arc Network</div>
+          <div class="title">Payment Settled Successfully</div>
+          <div class="success-badge">Paid & Confirmed</div>
+        </div>
+        
+        <div class="amount-card">
+          <div class="amount-val">$${invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+          <div class="amount-lbl">Settled Total (USDC)</div>
+        </div>
+        
+        <div class="details-list">
+          <div class="details-item">
+            <span class="details-key">Invoice ID</span>
+            <span class="details-val" style="font-family: monospace; text-transform: uppercase;">${invoice.id.substring(0,18)}</span>
+          </div>
+          <div class="details-item">
+            <span class="details-key">Client Name</span>
+            <span class="details-val">${invoice.clientName}</span>
+          </div>
+          <div class="details-item">
+            <span class="details-key">Client Email</span>
+            <span class="details-val">${invoice.clientEmail}</span>
+          </div>
+          <div class="details-item">
+            <span class="details-key">Settlement Asset</span>
+            <span class="details-val" style="color: #004c22;">USDC (On-Chain Native)</span>
+          </div>
+        </div>
+        
+        <div style="background-color: #faf9f9; border: 1px solid #bfc9bd; border-radius: 8px; padding: 16px; margin: 24px 0;">
+          <span style="font-size: 12px; font-weight: bold; color: #767d74; text-transform: uppercase; display: block;">Blockchain Tx Hash</span>
+          <span class="tx-link">${invoice.txHash}</span>
+        </div>
+        
+        <div class="footer">
+          <p>This transaction has been successfully verified on the blockchain ledger.</p>
+          <p>© 2026 Arc Network Inc. All rights reserved.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+async function sendTransactionalEmail(to, subject, html) {
+  try {
+    if (!resend) {
+      console.log(`[Resend Mock] Email dispatch mock trigger to: ${to} | Subject: ${subject}`);
+      return;
+    }
+    
+    const fromAddress = 'ArcPay <onboarding@resend.dev>';
+    
+    console.log(`[Resend] Firing email notification to: ${to}...`);
+    const { data, error } = await resend.emails.send({
+      from: fromAddress,
+      to: [to],
+      subject: subject,
+      html: html,
+    });
+    
+    if (error) {
+      console.error('[Resend Error] API call failed:', error);
+    } else {
+      console.log('[Resend Success] Email sent successfully! Message ID:', data.id);
+    }
+  } catch (err) {
+    console.error('[Resend Exception] Dispatch failed:', err.message);
+  }
+}
 
 app.use(cors());
 app.use(express.json());
@@ -238,6 +412,12 @@ app.post('/api/invoices', async (req, res) => {
     });
     
     await dispatchWebhook('invoice.created', invoice);
+    
+    // Dispatch automated payment request email to client
+    if (invoice.status === 'pending') {
+      await sendTransactionalEmail(invoice.clientEmail, 'Payment Request from Arc Network', getInvoiceEmailHTML(invoice));
+    }
+    
     res.json({ success: true, invoice });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -281,6 +461,26 @@ app.post('/api/invoices/:id/pay', async (req, res) => {
     });
     
     await dispatchWebhook('invoice.paid', invoice);
+    
+    // Dispatch beautifully formatted receipt to client
+    await sendTransactionalEmail(invoice.clientEmail, 'Payment Settle Receipt - Arc Network', getReceiptEmailHTML(invoice));
+    
+    // Dispatch dynamic revenue alert email to merchant settings address
+    const businessEmailSetting = await prisma.setting.findUnique({ where: { key: 'businessEmail' } });
+    const merchantEmail = businessEmailSetting?.value || 'finance@arcpay.io';
+    
+    const merchantAlertHTML = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; border: 1px solid #bfc9bd; border-radius: 12px; max-width: 500px; margin: auto;">
+        <h2 style="color: #004c22; margin-top: 0;">💰 USDC Gross Revenue Alert</h2>
+        <p>Your client <b>${invoice.clientName}</b> has successfully settled their invoice on-chain!</p>
+        <div style="background-color: #f0f7f2; border: 1px solid #bfc9bd; padding: 16px; border-radius: 8px; text-align: center; margin: 16px 0;">
+          <span style="font-size: 28px; font-weight: bold; color: #004c22;">$${invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+        </div>
+        <p style="font-size: 13px; color: #767d74; margin-bottom: 0;">Blockchain Transaction Hash:<br><code style="word-break: break-all; color: #004c22;">${invoice.txHash}</code></p>
+      </div>
+    `;
+    await sendTransactionalEmail(merchantEmail, `USDC Revenue Alert: $${invoice.amount} Received!`, merchantAlertHTML);
+    
     res.json({ success: true, invoice });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
