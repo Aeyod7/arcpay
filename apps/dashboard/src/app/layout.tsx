@@ -12,7 +12,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_ZmFrZS1jbGVyay1rZXktZm9yLWJ1aWxkLmNsZXJrLmFjY291bnRzLmRldiQ';
 
   const content = (
     <html lang="en">
@@ -32,14 +32,9 @@ export default function RootLayout({
     </html>
   );
 
-  // Hybrid Auth Wrap Fallback
-  if (publishableKey) {
-    return (
-      <ClerkProvider publishableKey={publishableKey}>
-        {content}
-      </ClerkProvider>
-    );
-  }
-
-  return content;
+  return (
+    <ClerkProvider publishableKey={publishableKey}>
+      {content}
+    </ClerkProvider>
+  );
 }
