@@ -1,0 +1,33 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Invoice {
+  id          String   @id @default(uuid())
+  clientName  String
+  clientEmail String
+  amount      Float
+  description String
+  status      String   // "pending", "paid", "overdue"
+  txHash      String?
+  createdAt   DateTime @default(now())
+}
+
+model Payout {
+  id        String   @id @default(uuid())
+  amount    Float
+  address   String
+  currency  String   // "USDC", "ETH", etc.
+  status    String   // "submitted", "reviewing", "completed"
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  key   String @id
+  value String
+}
