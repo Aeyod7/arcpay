@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build --prefix ../.. --workspace=@arcpay/sdk && npm run build --prefix ../.. --workspace=@arcpay/ui && next build",
     "start": "next start"
   },
   "dependencies": {
