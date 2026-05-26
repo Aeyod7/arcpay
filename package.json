@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=@arcpay/sdk && npm run build --workspace=@arcpay/ui && npm run build --workspace=arcpay-dashboard",
-    "dev": "npm run dev --workspaces --parallel"
+    "dev": "npm run dev --workspaces --parallel",
+    "vercel-build": "npm run build --workspace=@arcpay/sdk && npx prisma@5.16.1 generate --schema=apps/api/prisma/schema.prisma"
   }
 }
