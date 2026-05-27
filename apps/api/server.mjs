@@ -166,7 +166,7 @@ async function sendTransactionalEmail(to, subject, html) {
       return;
     }
     
-    const fromAddress = 'ArcPay <onboarding@resend.dev>';
+    const fromAddress = 'ArcPay <billing@arcpaye.com>';
     
     console.log(`[Resend] Firing email notification to: ${to}...`);
     const { data, error } = await resend.emails.send({
