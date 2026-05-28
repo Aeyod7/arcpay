@@ -6,6 +6,16 @@ import { fileURLToPath } from 'url';
 import { PrismaClient } from './prisma/client/index.js';
 import { Resend } from 'resend';
 
+// Route modules
+import merchantRoutes from './routes/merchant.mjs';
+import extendedInvoiceRoutes from './routes/invoices.mjs';
+import apiKeyRoutes from './routes/apikeys.mjs';
+import webhookRoutes from './routes/webhooks.mjs';
+import v1InvoiceRoutes from './routes/v1/invoices.mjs';
+
+// Auth middleware
+import { clerkAuth } from './middleware/clerkAuth.mjs';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -14,6 +24,11 @@ const app = express();
 const PORT = process.env.PORT || 62650;
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
+// Make Resend instance globally accessible (for route modules)
+if (resend) {
+  global.__resend = resend;
+}
 
 // Premium Emerald HTML Invoice Request Email Template
 function getInvoiceEmailHTML(invoice) {
@@ -206,6 +221,87 @@ app.use((req, res, next) => {
 // Serve static HTML/JS/CSS files of the app
 app.use(express.static(__dirname));
 
+// ============================================
+// RECURRING INVOICE API ROUTES
+// ============================================
+
+// GET /api/recurring-invoices - List recurring schedules
+app.get('/api/recurring-invoices', async (req, res) => {
+  try {
+    const merchantId = req.merchantId || req.query.merchantId || 'default_merchant';
+    const recurrings = await prisma.recurringInvoice.findMany({
+      where: { merchantId },
+      orderBy: { createdAt: 'desc' }
+    });
+    // Parse templateData from string to object
+    const parsed = recurrings.map(r => ({
+      ...r,
+      templateData: typeof r.templateData === 'string' ? JSON.parse(r.templateData) : r.templateData
+    }));
+    res.json({ success: true, recurrings: parsed });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/recurring-invoices - Create recurring schedule
+app.post('/api/recurring-invoices', async (req, res) => {
+  try {
+    const { merchantId, templateData, frequency } = req.body;
+    if (!templateData || !templateData.clientEmail || !templateData.amount) {
+      return res.status(400).json({ success: false, error: 'templateData with clientEmail and amount required' });
+    }
+    if (!['weekly', 'monthly', 'quarterly'].includes(frequency)) {
+      return res.status(400).json({ success: false, error: 'frequency must be weekly, monthly, or quarterly' });
+    }
+    
+    // Calculate next run date
+    const nextRunAt = new Date();
+    switch (frequency) {
+      case 'weekly': nextRunAt.setDate(nextRunAt.getDate() + 7); break;
+      case 'monthly': nextRunAt.setMonth(nextRunAt.getMonth() + 1); break;
+      case 'quarterly': nextRunAt.setMonth(nextRunAt.getMonth() + 3); break;
+    }
+    
+    const recurring = await prisma.recurringInvoice.create({
+      data: {
+        merchantId,
+        templateData: JSON.stringify(templateData),
+        frequency,
+        nextRunAt
+      }
+    });
+    
+    res.status(201).json({ success: true, recurring });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/recurring-invoices/:id - Toggle active status
+app.patch('/api/recurring-invoices/:id', async (req, res) => {
+  try {
+    const { active } = req.body;
+    const recurring = await prisma.recurringInvoice.update({
+      where: { id: req.params.id },
+      data: { active: active !== undefined ? active : undefined }
+    });
+    res.json({ success: true, recurring });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/recurring-invoices/:id - Delete schedule
+app.delete('/api/recurring-invoices/:id', async (req, res) => {
+  try {
+    await prisma.recurringInvoice.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Schedule deleted.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Background Webhook Dispatcher
 async function dispatchWebhook(eventName, payload) {
   try {
@@ -236,24 +332,63 @@ async function dispatchWebhook(eventName, payload) {
   }
 }
 
+// Apply Clerk auth middleware to API routes
+app.use('/api', clerkAuth);
+
+// Register new route modules
+app.use('/api/merchant', merchantRoutes);
+app.use('/api/invoices', extendedInvoiceRoutes);
+app.use('/api/api-keys', apiKeyRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/v1/invoices', v1InvoiceRoutes);
+
 // Custom Cloud DB Init Endpoint (Creates PostgreSQL tables programmatically over serverless)
 app.post('/api/db-init', async (req, res) => {
   try {
     console.log("[Database] Initializing cloud PostgreSQL tables...");
     
-    // Create Invoice Table
+    // Create/Update Invoice Table
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "Invoice" (
         "id" VARCHAR(255) PRIMARY KEY,
+        "invoiceNumber" VARCHAR(255) UNIQUE,
         "clientName" VARCHAR(255) NOT NULL,
         "clientEmail" VARCHAR(255) NOT NULL,
+        "clientWallet" VARCHAR(255),
         "amount" DOUBLE PRECISION NOT NULL,
         "description" VARCHAR(255) NOT NULL,
-        "status" VARCHAR(50) NOT NULL,
+        "lineItems" TEXT,
+        "status" VARCHAR(50) NOT NULL DEFAULT 'pending',
         "txHash" VARCHAR(255),
-        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        "blockNumber" INTEGER,
+        "paidAt" TIMESTAMP WITH TIME ZONE,
+        "dueDate" TIMESTAMP WITH TIME ZONE,
+        "merchantId" VARCHAR(255),
+        "batchId" VARCHAR(255),
+        "memo" TEXT,
+        "metadata" TEXT,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    
+    // Try to add new columns if they don't exist (PostgreSQL will error on duplicate)
+    const newColumns = [
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "invoiceNumber" VARCHAR(255)',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "clientWallet" VARCHAR(255)',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "lineItems" TEXT',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "blockNumber" INTEGER',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMP WITH TIME ZONE',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "dueDate" TIMESTAMP WITH TIME ZONE',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "merchantId" VARCHAR(255)',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "batchId" VARCHAR(255)',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "memo" TEXT',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "metadata" TEXT',
+      'ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP'
+    ];
+    for (const sql of newColumns) {
+      try { await prisma.$executeRawUnsafe(sql); } catch (e) { /* column may already exist */ }
+    }
     
     // Create Payout Table
     await prisma.$executeRawUnsafe(`
@@ -272,6 +407,73 @@ app.post('/api/db-init', async (req, res) => {
       CREATE TABLE IF NOT EXISTS "Setting" (
         "key" VARCHAR(255) PRIMARY KEY,
         "value" TEXT NOT NULL
+      );
+    `);
+    
+    // Create MerchantProfile Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "MerchantProfile" (
+        "id" VARCHAR(255) PRIMARY KEY,
+        "userId" VARCHAR(255) UNIQUE NOT NULL,
+        "businessName" VARCHAR(255) NOT NULL,
+        "logoUrl" VARCHAR(255),
+        "email" VARCHAR(255),
+        "address" VARCHAR(255),
+        "taxId" VARCHAR(255),
+        "website" VARCHAR(255),
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // Create InvoiceBatch Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "InvoiceBatch" (
+        "id" VARCHAR(255) PRIMARY KEY,
+        "merchantId" VARCHAR(255) NOT NULL,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "totalCount" INTEGER NOT NULL,
+        "totalAmount" DECIMAL NOT NULL
+      );
+    `);
+    
+    // Create ApiKey Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ApiKey" (
+        "id" VARCHAR(255) PRIMARY KEY,
+        "merchantId" VARCHAR(255) NOT NULL,
+        "keyHash" VARCHAR(255) UNIQUE NOT NULL,
+        "keyPrefix" VARCHAR(255) NOT NULL,
+        "label" VARCHAR(255) NOT NULL,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        "lastUsedAt" TIMESTAMP WITH TIME ZONE,
+        "active" BOOLEAN DEFAULT TRUE
+      );
+    `);
+    
+    // Create Webhook Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "Webhook" (
+        "id" VARCHAR(255) PRIMARY KEY,
+        "merchantId" VARCHAR(255) NOT NULL,
+        "url" VARCHAR(255) NOT NULL,
+        "events" TEXT[] NOT NULL DEFAULT '{}',
+        "secret" VARCHAR(255) NOT NULL,
+        "active" BOOLEAN DEFAULT TRUE,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    
+    // Create RecurringInvoice Table
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "RecurringInvoice" (
+        "id" VARCHAR(255) PRIMARY KEY,
+        "merchantId" VARCHAR(255) NOT NULL,
+        "templateData" TEXT NOT NULL,
+        "frequency" VARCHAR(255) NOT NULL,
+        "nextRunAt" TIMESTAMP WITH TIME ZONE NOT NULL,
+        "active" BOOLEAN DEFAULT TRUE,
+        "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
     

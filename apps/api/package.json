@@ -9,12 +9,14 @@
     "build": "npm run build --prefix ../.. --workspace=@arcpay/sdk && npx prisma@5.16.1 generate"
   },
   "dependencies": {
-    "express": "^4.19.2",
+    "@arcpay/sdk": "*",
+    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@prisma/client": "^5.16.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.1",
-    "@prisma/client": "^5.16.1",
-    "@arcpay/sdk": "*",
+    "express": "^4.19.2",
+    "pdfkit": "^0.15.0",
     "resend": "^4.0.0"
   }
 }

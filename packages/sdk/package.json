@@ -1,13 +1,62 @@
 {
   "name": "@arcpay/sdk",
   "version": "1.0.0",
+  "description": "Official ArcPay SDK — Create, manage, and verify invoices and receipts for the Arc Network stablecoin economy",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "package.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "prepare": "npm run build"
   },
   "dependencies": {
     "ethers": "^6.13.1"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aeyod7/arcpay.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://arcpaye.com",
+  "bugs": {
+    "url": "https://github.com/Aeyod7/arcpay/issues"
+  },
+  "keywords": [
+    "arcpay",
+    "arc-network",
+    "stablecoin",
+    "usdc",
+    "invoices",
+    "receipts",
+    "payments",
+    "web3",
+    "blockchain"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "ArcPay",
+    "email": "billing@arcpaye.com",
+    "url": "https://arcpaye.com"
   }
 }

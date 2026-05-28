@@ -10,14 +10,27 @@ generator client {
 }
 
 model Invoice {
-  id          String   @id @default(uuid())
-  clientName  String
-  clientEmail String
-  amount      Float
-  description String
-  status      String   // "pending", "paid", "overdue"
-  txHash      String?
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  invoiceNumber String?  @unique // e.g. "INV-2025-0042"
+  clientName    String
+  clientEmail   String
+  clientWallet  String?
+  amount        Float
+  description   String
+  lineItems     Json?    // [{description, quantity, unitPrice, subtotal}]
+  status        String   // "pending", "paid", "overdue", "cancelled"
+  txHash        String?
+  blockNumber   Int?
+  paidAt        DateTime?
+  dueDate       DateTime?
+  merchantId    String?
+  batchId       String?
+  memo          String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  batch InvoiceBatch? @relation(fields: [batchId], references: [id])
 }
 
 model Payout {
@@ -32,4 +45,57 @@ model Payout {
 model Setting {
   key   String @id
   value String
+}
+
+model MerchantProfile {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  businessName String
+  logoUrl      String?
+  email        String?
+  address      String?
+  taxId        String?
+  website      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model InvoiceBatch {
+  id          String    @id @default(cuid())
+  merchantId  String
+  createdAt   DateTime  @default(now())
+  totalCount  Int
+  totalAmount Decimal
+  invoices    Invoice[]
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  merchantId String
+  keyHash    String    @unique
+  keyPrefix  String    // first 8 chars for display: "apk_live_xxxx..."
+  label      String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  active     Boolean   @default(true)
+}
+
+model Webhook {
+  id         String   @id @default(cuid())
+  merchantId String
+  url        String
+  events     String[]
+  secret     String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model RecurringInvoice {
+  id           String   @id @default(cuid())
+  merchantId   String
+  templateData Json
+  frequency    String   // "weekly" | "monthly" | "quarterly"
+  nextRunAt    DateTime
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
 }
