@@ -15,6 +15,7 @@ import v1InvoiceRoutes from './routes/v1/invoices.mjs';
 
 // Auth middleware
 import { clerkAuth } from './middleware/clerkAuth.mjs';
+import { generateInvoiceNumber } from './lib/invoiceHelpers.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -598,18 +599,29 @@ app.get('/api/dashboard', async (req, res) => {
 // 2. Invoices REST routes
 app.post('/api/invoices', async (req, res) => {
   try {
-    const { clientName, clientEmail, amount, description, status } = req.body;
+    const { clientName, clientEmail, amount, description, status, clientWallet, lineItems, dueDate, memo, metadata } = req.body;
     if (!clientName || !clientEmail || !amount) {
       return res.status(400).json({ success: false, error: 'Missing clientName, clientEmail, or amount' });
     }
     
+    const parsedLineItems = lineItems 
+      ? (typeof lineItems === 'string' ? JSON.parse(lineItems) : lineItems)
+      : [{ description: description || 'USDC Settlement Invoice', quantity: 1, unitPrice: parseFloat(amount) }];
+
     const invoice = await prisma.invoice.create({
       data: {
+        invoiceNumber: generateInvoiceNumber(),
         clientName,
         clientEmail,
         amount: parseFloat(amount),
         description: description || 'USDC Settlement Invoice',
-        status: status || 'pending'
+        status: status || 'pending',
+        clientWallet: clientWallet || null,
+        lineItems: parsedLineItems,
+        dueDate: dueDate ? new Date(dueDate) : null,
+        memo: memo || null,
+        metadata: metadata || null,
+        merchantId: req.merchantId || 'default_merchant'
       }
     });
     
@@ -684,6 +696,30 @@ app.post('/api/invoices/:id/pay', async (req, res) => {
     await sendTransactionalEmail(merchantEmail, `USDC Revenue Alert: $${invoice.amount} Received!`, merchantAlertHTML);
     
     res.json({ success: true, invoice });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/invoices/:id/cancel', async (req, res) => {
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: req.params.id }
+    });
+    if (!invoice) {
+      return res.status(404).json({ success: false, error: 'Invoice not found' });
+    }
+    if (invoice.status !== 'pending') {
+      return res.status(400).json({ success: false, error: 'Invoice can only be cancelled if it is pending' });
+    }
+
+    const updated = await prisma.invoice.update({
+      where: { id: req.params.id },
+      data: { status: 'cancelled' }
+    });
+
+    await dispatchWebhook('invoice.cancelled', updated);
+    res.json({ success: true, invoice: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

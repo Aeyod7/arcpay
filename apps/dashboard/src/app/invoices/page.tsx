@@ -6,12 +6,14 @@ import { InvoiceStatusBadge } from '@arcpay/ui';
 
 interface Invoice {
   id: string;
+  invoiceNumber?: string;
   clientName: string;
   clientEmail: string;
   amount: number;
   description: string;
-  status: 'paid' | 'pending' | 'overdue';
+  status: 'paid' | 'pending' | 'overdue' | 'cancelled';
   createdAt: string;
+  dueDate?: string;
 }
 
 export default function InvoicesHistoryPage() {
@@ -122,6 +124,67 @@ export default function InvoicesHistoryPage() {
     } finally {
       setProcessingBatch(false);
     }
+  };
+
+  const copyReceiptLink = (id: string) => {
+    const url = `${window.location.origin}/receipt/${id}`;
+    navigator.clipboard.writeText(url);
+    alert('Receipt link copied!');
+  };
+
+  const handleCancelInvoice = async (id: string) => {
+    if (!confirm('Are you sure you want to cancel this invoice?')) return;
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650';
+      const res = await fetch(`${apiUrl}/api/invoices/${id}/cancel`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Invoice cancelled successfully.');
+        await fetchInvoices();
+      } else {
+        alert('Failed to cancel invoice: ' + data.error);
+      }
+    } catch (err) {
+      console.error('Failed to cancel invoice:', err);
+    }
+  };
+
+  const getStatusBadge = (status: string, dueDateStr?: string) => {
+    const normalized = status.toLowerCase();
+    
+    // Check if overdue
+    const isOverdue = normalized === 'overdue' || (normalized === 'pending' && dueDateStr && new Date(dueDateStr) < new Date());
+    
+    let bg = 'bg-gray-50 text-gray-500 border-gray-200';
+    let dot = 'bg-gray-400';
+    let label = status.charAt(0).toUpperCase() + status.slice(1);
+
+    if (normalized === 'paid') {
+      bg = 'bg-green-50 text-green-700 border-green-200';
+      dot = 'bg-[#22c55e]';
+      label = 'Paid';
+    } else if (isOverdue) {
+      bg = 'bg-red-50 text-red-700 border-red-200';
+      dot = 'bg-[#ef4444]';
+      label = 'Overdue';
+    } else if (normalized === 'pending') {
+      bg = 'bg-amber-50 text-amber-700 border-amber-200';
+      dot = 'bg-[#f59e0b]';
+      label = 'Pending';
+    } else if (normalized === 'cancelled') {
+      bg = 'bg-gray-50 text-gray-400 border-gray-200';
+      dot = 'bg-gray-300';
+      label = 'Cancelled';
+    }
+
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold border ${bg} space-x-1.5 select-none uppercase tracking-wider`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${dot}`}></span>
+        <span>{label}</span>
+      </span>
+    );
   };
 
   const selectedInvoices = invoices.filter(i => selectedIds.includes(i.id));
@@ -241,7 +304,7 @@ export default function InvoicesHistoryPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-zinc-50 border-b border-[#bfc9bd]/15">
+                  <tr className="bg-zinc-50 border-b border-[#bfc9bd]/15 text-xs font-bold text-zinc-500 uppercase tracking-wider">
                     <th className="p-4 w-12 text-center">
                       {pendingInvoices.length > 0 && (
                         <input
@@ -252,45 +315,118 @@ export default function InvoicesHistoryPage() {
                         />
                       )}
                     </th>
-                    <th className="p-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Client Details</th>
-                    <th className="p-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Created</th>
-                    <th className="p-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Description</th>
-                    <th className="p-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Amount</th>
-                    <th className="p-4 text-xs font-bold text-zinc-500 uppercase tracking-wider">Settlement Status</th>
+                    <th className="p-4">Invoice #</th>
+                    <th className="p-4">Client Details</th>
+                    <th className="p-4">Issued</th>
+                    <th className="p-4">Due Date</th>
+                    <th className="p-4 text-right">Amount</th>
+                    <th className="p-4">Status</th>
+                    <th className="p-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((invoice) => (
-                    <tr
-                      key={invoice.id}
-                      className="border-b border-[#bfc9bd]/10 hover:bg-[#faf9f9]/50 transition-colors"
-                    >
-                      <td className="p-4 text-center">
-                        {invoice.status === 'pending' && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(invoice.id)}
-                            onChange={(e) => handleSelectRow(invoice.id, e.target.checked)}
-                            className="rounded border-gray-300 text-[#004c22] focus:ring-[#004c22]"
-                          />
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="font-semibold text-zinc-800 text-sm">{invoice.clientName}</div>
-                        <div className="text-xs font-mono text-zinc-400 mt-0.5">{invoice.clientEmail}</div>
-                      </td>
-                      <td className="p-4 text-sm text-zinc-500">
-                        {new Date(invoice.createdAt).toLocaleDateString()}
-                      </td>
-                      <td className="p-4 text-sm text-zinc-500">{invoice.description}</td>
-                      <td className="p-4 font-mono font-semibold text-sm text-zinc-800">
-                        {invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDC
-                      </td>
-                      <td className="p-4">
-                        <InvoiceStatusBadge status={invoice.status} />
-                      </td>
-                    </tr>
-                  ))}
+                  {invoices.map((invoice) => {
+                    const isOverdue = invoice.status === 'overdue' || 
+                      (invoice.status === 'pending' && invoice.dueDate && new Date(invoice.dueDate) < new Date());
+
+                    return (
+                      <tr
+                        key={invoice.id}
+                        className="border-b border-[#bfc9bd]/10 hover:bg-[#faf9f9]/50 transition-colors text-sm"
+                      >
+                        <td className="p-4 text-center">
+                          {invoice.status === 'pending' && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(invoice.id)}
+                              onChange={(e) => handleSelectRow(invoice.id, e.target.checked)}
+                              className="rounded border-gray-300 text-[#004c22] focus:ring-[#004c22]"
+                            />
+                          )}
+                        </td>
+                        <td className="p-4 font-mono font-bold text-xs">
+                          <a 
+                            href={`/receipt/${invoice.id}`} 
+                            target="_blank" 
+                            className="text-[#004c22] hover:underline"
+                          >
+                            {invoice.invoiceNumber || invoice.id.substring(0, 18).toUpperCase()}
+                          </a>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-semibold text-zinc-800">{invoice.clientName}</div>
+                          <div className="text-xs font-mono text-zinc-400 mt-0.5">{invoice.clientEmail}</div>
+                        </td>
+                        <td className="p-4 text-xs text-zinc-500">
+                          {new Date(invoice.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </td>
+                        <td className="p-4 text-xs">
+                          {invoice.dueDate ? (
+                            <span className={isOverdue ? "text-red-500 font-semibold flex items-center space-x-1" : "text-zinc-600"}>
+                              <span>{new Date(invoice.dueDate).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}</span>
+                              {isOverdue && <span className="text-xs">⚠</span>}
+                            </span>
+                          ) : (
+                            <span className="text-zinc-400">—</span>
+                          )}
+                        </td>
+                        <td className="p-4 font-mono font-semibold text-zinc-800 text-right">
+                          ${invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDC
+                        </td>
+                        <td className="p-4">
+                          {getStatusBadge(invoice.status, invoice.dueDate || undefined)}
+                        </td>
+                        <td className="p-4 text-center">
+                          <div className="flex justify-center items-center space-x-2">
+                            <a
+                              href={`/receipt/${invoice.id}`}
+                              target="_blank"
+                              title="View Receipt"
+                              className="p-1 hover:text-[#004c22] text-zinc-400 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-sm">visibility</span>
+                            </a>
+                            {invoice.status === 'paid' && (
+                              <a
+                                href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:62650'}/api/invoices/${invoice.id}/receipt.pdf`}
+                                download
+                                title="Download PDF"
+                                className="p-1 hover:text-[#004c22] text-zinc-400 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-sm">download</span>
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              title="Copy Receipt Link"
+                              onClick={() => copyReceiptLink(invoice.id)}
+                              className="p-1 hover:text-[#004c22] text-zinc-400 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-sm">content_copy</span>
+                            </button>
+                            {invoice.status === 'pending' && (
+                              <button
+                                type="button"
+                                title="Cancel Invoice"
+                                onClick={() => handleCancelInvoice(invoice.id)}
+                                className="p-1 hover:text-red-500 text-zinc-400 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-sm">cancel</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

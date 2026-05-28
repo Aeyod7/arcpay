@@ -7,9 +7,12 @@ const prisma = new PrismaClient();
  * Generate an invoice number in the format INV-YYYY-XXXX
  */
 export function generateInvoiceNumber(index = 0) {
-  const year = new Date().getFullYear();
-  const seq = String(Math.floor(Math.random() * 9000) + 1000 + index).padStart(4, '0');
-  return `INV-${year}-${seq}`;
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const seq = String(Math.floor(Math.random() * 9000) + 1000 + index).slice(-4).padStart(4, '0');
+  return `INV-${yyyy}${mm}${dd}-${seq}`;
 }
 
 /**

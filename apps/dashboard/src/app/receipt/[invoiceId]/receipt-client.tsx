@@ -27,6 +27,7 @@ interface Merchant {
   email?: string;
   address?: string;
   website?: string;
+  logoUrl?: string;
 }
 
 export default function PublicReceiptPage() {
@@ -130,198 +131,255 @@ export default function PublicReceiptPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#faf9f9] py-12 px-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          {/* Header */}
-          <div className="bg-[#004c22] px-8 py-6">
-            <div className="flex justify-between items-start">
+    <div className="min-h-screen bg-[#faf9f9] py-16 px-4 flex items-center justify-center font-sans text-sm text-[#1a1c1c]">
+      <div className="max-w-2xl w-full">
+        <div className="bg-white rounded-2xl border border-[#bfc9bd]/25 shadow-md overflow-hidden">
+          
+          {/* Section 1 — Header: Merchant Identity */}
+          <div className="px-8 py-8 border-b border-gray-100 flex justify-between items-center bg-zinc-50/10">
+            <div className="flex items-center space-x-4">
+              {merchant.logoUrl ? (
+                <img 
+                  src={merchant.logoUrl} 
+                  alt={merchant.businessName} 
+                  className="w-12 h-12 rounded-xl object-contain border border-[#bfc9bd]/20 p-1 bg-white" 
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-xl border border-dashed border-[#bfc9bd]/40 flex items-center justify-center bg-[#f0f7f2] text-[#004c22]">
+                  <span className="material-symbols-outlined text-2xl">store</span>
+                </div>
+              )}
               <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Arc Network</h1>
-                <p className="text-[#a6f4b5] text-sm mt-1">Stablecoin Payment Receipt</p>
+                <h1 className="text-lg font-bold text-zinc-850 tracking-tight">
+                  {merchant.businessName || 'ArcPay Merchant'}
+                </h1>
+                {merchant.email && (
+                  <p className="text-xs text-zinc-400 mt-0.5">{merchant.email}</p>
+                )}
               </div>
-              <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getStatusColor(invoice.status)}`}>
-                {invoice.status === 'paid' ? 'PAID' : invoice.status.toUpperCase()}
-              </div>
             </div>
-          </div>
-
-          {/* Amount Hero */}
-          <div className="px-8 py-8 bg-gradient-to-b from-[#f0f7f2] to-white border-b border-gray-100">
-            <div className="text-center">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Amount</p>
-              <p className="text-4xl font-extrabold text-[#004c22] font-mono">
-                ${invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="text-sm font-semibold text-gray-400 mt-1">USDC on Arc Network</p>
-            </div>
-          </div>
-
-          {/* Invoice Details */}
-          <div className="px-8 py-6 grid grid-cols-2 gap-x-8 gap-y-4 border-b border-gray-100">
+            
             <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Invoice Number</p>
-              <p className="text-sm font-semibold text-gray-800 mt-1 font-mono">
-                {invoice.invoiceNumber || invoice.id.substring(0, 18).toUpperCase()}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Date Issued</p>
-              <p className="text-sm font-semibold text-gray-800 mt-1">
-                {new Date(invoice.createdAt).toLocaleDateString('en-US', { 
-                  year: 'numeric', month: 'long', day: 'numeric' 
-                })}
-              </p>
-            </div>
-            {invoice.paidAt && (
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Date Paid</p>
-                <p className="text-sm font-semibold text-gray-800 mt-1">
-                  {new Date(invoice.paidAt).toLocaleDateString('en-US', { 
-                    year: 'numeric', month: 'long', day: 'numeric' 
-                  })}
-                </p>
-              </div>
-            )}
-            {invoice.dueDate && (
-              <div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Due Date</p>
-                <p className="text-sm font-semibold text-gray-800 mt-1">
-                  {new Date(invoice.dueDate).toLocaleDateString('en-US', { 
-                    year: 'numeric', month: 'long', day: 'numeric' 
-                  })}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* From / To */}
-          <div className="px-8 py-6 grid grid-cols-2 gap-x-8 border-b border-gray-100">
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">From</p>
-              <p className="text-sm font-semibold text-gray-800">{merchant.businessName}</p>
-              {merchant.email && <p className="text-sm text-gray-500 mt-0.5">{merchant.email}</p>}
-              {merchant.address && <p className="text-sm text-gray-500 mt-0.5">{merchant.address}</p>}
-            </div>
-            <div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">To</p>
-              <p className="text-sm font-semibold text-gray-800">{invoice.clientName}</p>
-              <p className="text-sm text-gray-500 mt-0.5">{invoice.clientEmail}</p>
-              {invoice.clientWallet && (
-                <p className="text-xs font-mono text-gray-400 mt-1 break-all">Wallet: {invoice.clientWallet}</p>
+              {invoice.status === 'paid' && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold border bg-green-50 text-green-700 border-green-200 uppercase tracking-wider space-x-1.5 select-none">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]"></span>
+                  <span>Paid & Verified</span>
+                </span>
+              )}
+              {invoice.status === 'pending' && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200 uppercase tracking-wider space-x-1.5 select-none">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#f59e0b]"></span>
+                  <span>Pending</span>
+                </span>
+              )}
+              {invoice.status === 'overdue' && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold border bg-red-50 text-red-700 border-red-200 uppercase tracking-wider space-x-1.5 select-none">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#ef4444]"></span>
+                  <span>Overdue</span>
+                </span>
+              )}
+              {invoice.status === 'cancelled' && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold border bg-gray-50 text-gray-500 border-gray-200 uppercase tracking-wider space-x-1.5 select-none">
+                  <span className="h-1.5 w-1.5 rounded-full bg-gray-300"></span>
+                  <span>Cancelled</span>
+                </span>
               )}
             </div>
           </div>
 
-          {/* Line Items */}
+          {/* Section 2 — Invoice Meta */}
+          <div className="px-8 py-6 border-b border-gray-100 grid grid-cols-2 gap-y-3 text-xs bg-zinc-50/5">
+            <div className="flex justify-between pr-8 border-r border-[#bfc9bd]/10">
+              <span className="font-bold text-zinc-400 uppercase tracking-wider">Invoice</span>
+              <span className="font-mono font-bold text-zinc-800">
+                {invoice.invoiceNumber || invoice.id.substring(0, 18).toUpperCase()}
+              </span>
+            </div>
+            <div className="flex justify-between pl-8">
+              <span className="font-bold text-zinc-400 uppercase tracking-wider">Issued</span>
+              <span className="font-semibold text-zinc-800">
+                {new Date(invoice.createdAt).toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
+            {invoice.status !== 'paid' && invoice.dueDate && (
+              <div className="flex justify-between pr-8 border-r border-[#bfc9bd]/10 pt-1">
+                <span className="font-bold text-zinc-400 uppercase tracking-wider">Due</span>
+                <span className="font-semibold text-zinc-800">
+                  {new Date(invoice.dueDate).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
+              </div>
+            )}
+            {invoice.status === 'paid' && invoice.paidAt && (
+              <div className="flex justify-between pr-8 border-r border-[#bfc9bd]/10 pt-1">
+                <span className="font-bold text-zinc-400 uppercase tracking-wider">Settled</span>
+                <span className="font-semibold text-zinc-800">
+                  {new Date(invoice.paidAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })} at {new Date(invoice.paidAt).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'UTC',
+                    timeZoneName: 'short'
+                  })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Section 3 — Billed To */}
           <div className="px-8 py-6 border-b border-gray-100">
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Line Items</p>
-            <table className="w-full">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-2">Billed To</span>
+            <div className="text-sm font-semibold text-zinc-800">{invoice.clientName}</div>
+            <div className="text-xs text-zinc-500 mt-0.5">{invoice.clientEmail}</div>
+            {invoice.clientWallet && (
+              <div className="text-xs text-zinc-400 font-mono mt-1 flex items-center space-x-1" title={invoice.clientWallet}>
+                <span>Wallet:</span>
+                <span className="cursor-help hover:text-[#004c22] underline decoration-dotted">
+                  {`${invoice.clientWallet.substring(0, 6)}...${invoice.clientWallet.substring(invoice.clientWallet.length - 4)}`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Section 4 — Line Items Table */}
+          <div className="px-8 py-6 border-b border-gray-100">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left pb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Description</th>
-                  <th className="text-right pb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Qty</th>
-                  <th className="text-right pb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Unit Price</th>
-                  <th className="text-right pb-2 text-xs font-bold text-gray-400 uppercase tracking-wider">Subtotal</th>
+                <tr className="border-b border-[#bfc9bd]/15 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                  <th className="pb-2">Description</th>
+                  <th className="pb-2 w-16 text-right">Qty</th>
+                  <th className="pb-2 w-24 text-right">Unit Price</th>
+                  <th className="pb-2 w-28 text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
-                {lineItems.length > 0 ? lineItems.map((item: any, idx: number) => {
-                  const qty = item.quantity || 1;
-                  const unitPrice = item.unitPrice || 0;
-                  const subtotal = qty * unitPrice;
-                  return (
-                    <tr key={idx} className="border-b border-gray-50">
-                      <td className="py-3 text-sm text-gray-800">{item.description || 'Item'}</td>
-                      <td className="py-3 text-sm text-gray-600 text-right">{qty}</td>
-                      <td className="py-3 text-sm text-gray-600 text-right font-mono">${unitPrice.toFixed(2)}</td>
-                      <td className="py-3 text-sm font-semibold text-gray-800 text-right font-mono">${subtotal.toFixed(2)}</td>
-                    </tr>
-                  );
-                }) : (
-                  <tr>
-                    <td className="py-3 text-sm text-gray-800">{invoice.description || 'USDC Settlement'}</td>
-                    <td className="py-3 text-sm text-gray-600 text-right">1</td>
-                    <td className="py-3 text-sm text-gray-600 text-right font-mono">${invoice.amount.toFixed(2)}</td>
-                    <td className="py-3 text-sm font-semibold text-gray-800 text-right font-mono">${invoice.amount.toFixed(2)}</td>
+                {lineItems.length > 0 ? (
+                  lineItems.map((item: any, idx: number) => {
+                    const qty = item.quantity || 1;
+                    const price = item.unitPrice || 0;
+                    return (
+                      <tr key={idx} className="border-b border-gray-50 text-xs">
+                        <td className="py-3 text-zinc-800 font-medium">{item.description}</td>
+                        <td className="py-3 text-zinc-500 text-right">{qty}</td>
+                        <td className="py-3 text-zinc-500 text-right font-mono">${price.toFixed(2)}</td>
+                        <td className="py-3 text-zinc-800 text-right font-mono font-semibold">${(qty * price).toFixed(2)}</td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr className="border-b border-gray-50 text-xs">
+                    <td className="py-3 text-zinc-800 font-medium">{invoice.description}</td>
+                    <td className="py-3 text-zinc-500 text-right">1</td>
+                    <td className="py-3 text-zinc-500 text-right font-mono">${invoice.amount.toFixed(2)}</td>
+                    <td className="py-3 text-zinc-800 text-right font-mono font-semibold">${invoice.amount.toFixed(2)}</td>
                   </tr>
                 )}
-              </tbody>
-              <tfoot>
                 <tr>
-                  <td colSpan={3} className="pt-4 text-sm font-bold text-gray-800 text-right">Total (USDC)</td>
-                  <td className="pt-4 text-sm font-bold text-[#004c22] text-right font-mono">
-                    ${invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  <td colSpan={3} className="pt-4 text-xs font-bold text-zinc-500 text-right uppercase tracking-wider">Total</td>
+                  <td className="pt-4 text-right font-mono font-bold text-[#004c22] text-base flex items-center justify-end space-x-1.5">
+                    <span>${invoice.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[10px] text-zinc-400 select-none">USDC</span>
                   </td>
                 </tr>
-              </tfoot>
+              </tbody>
             </table>
           </div>
 
-          {/* Blockchain Proof */}
-          {invoice.status === 'paid' && invoice.txHash && (
-            <div className="px-8 py-6 border-b border-gray-100 bg-gray-50/50">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">On-Chain Proof</p>
-              <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-3">
-                <div>
-                  <p className="text-xs text-gray-500 font-semibold">Transaction Hash</p>
+          {/* Section 5 — On-Chain Proof */}
+          <div className="px-8 py-6 border-b border-gray-100 bg-zinc-50/10">
+            {invoice.status === 'paid' && invoice.txHash ? (
+              <div className="flex flex-col items-center text-center space-y-3 py-2">
+                <div className="bg-white p-2 rounded-xl border border-[#bfc9bd]/25 shadow-sm inline-block select-none">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(getExplorerUrl(invoice.txHash))}`} 
+                    alt="Arc Ledger QR Link" 
+                    className="w-24 h-24"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-zinc-700 uppercase tracking-widest">
+                    On-Chain Settlement Proof
+                  </h4>
                   <a 
                     href={getExplorerUrl(invoice.txHash)} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-xs font-mono text-[#004c22] hover:underline break-all block mt-0.5"
+                    className="text-xs font-semibold text-[#004c22] hover:underline flex items-center justify-center space-x-0.5"
                   >
-                    {invoice.txHash}
-                    <span className="material-symbols-outlined text-xs ml-1 align-middle">open_in_new</span>
+                    <span>View on Arc Explorer</span>
+                    <span className="material-symbols-outlined text-[10px]">open_in_new</span>
                   </a>
+                  <span className="text-[9px] font-mono text-zinc-400 select-all block max-w-sm truncate mt-1">
+                    {invoice.txHash}
+                  </span>
+                  {invoice.blockNumber && (
+                    <span className="text-[10px] text-zinc-400 block pt-0.5">
+                      Block #{invoice.blockNumber} &bull; Cryptographically Verified
+                    </span>
+                  )}
                 </div>
-                {invoice.blockNumber && (
-                  <div>
-                    <p className="text-xs text-gray-500 font-semibold">Block Number</p>
-                    <p className="text-sm font-mono text-gray-800 mt-0.5">{invoice.blockNumber}</p>
-                  </div>
-                )}
               </div>
-            </div>
-          )}
+            ) : invoice.status === 'pending' ? (
+              <div className="py-4 text-center space-y-2">
+                <div className="inline-flex items-center space-x-1.5 text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl text-xs font-semibold select-none animate-pulse">
+                  <span className="material-symbols-outlined text-sm">sync</span>
+                  <span>Awaiting on-chain settlement</span>
+                </div>
+                <p className="text-xs text-zinc-400 max-w-xs mx-auto">
+                  This invoice will auto-confirm instantly when payment is detected on the Arc Network.
+                </p>
+              </div>
+            ) : (
+              <div className="py-2 text-center text-xs text-zinc-400 select-none">
+                No active settlement logs found for this invoice.
+              </div>
+            )}
+          </div>
 
-          {/* Memo */}
-          {invoice.memo && (
-            <div className="px-8 py-4 border-b border-gray-100">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Memo</p>
-              <p className="text-sm text-gray-600">{invoice.memo}</p>
-            </div>
-          )}
-
-          {/* Actions + Footer */}
-          <div className="px-8 py-6 space-y-4">
-            <div className="flex space-x-3">
+          {/* Section 6 — Actions */}
+          {invoice.status === 'paid' && (
+            <div className="px-8 py-6 border-b border-gray-100 flex space-x-4 bg-zinc-50/5">
               <a
                 href={getPdfUrl()}
                 download
-                className="flex-1 bg-[#004c22] hover:bg-[#1f6c3a] text-white text-center py-3 rounded-xl text-sm font-semibold transition-all shadow-sm flex items-center justify-center space-x-2"
+                className="flex-1 border border-[#bfc9bd]/50 hover:border-[#004c22] text-[#004c22] text-center py-2.5 rounded-xl text-xs font-bold transition-all hover:bg-gray-50/50 flex items-center justify-center space-x-1.5"
               >
-                <span className="material-symbols-outlined text-sm">download</span>
-                <span>Download PDF</span>
+                <span className="material-symbols-outlined text-xs">download</span>
+                <span>Download PDF Receipt</span>
               </a>
               <button
+                type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
-                  alert('Receipt URL copied!');
+                  alert('Receipt link copied!');
                 }}
-                className="px-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-all"
+                className="px-4 py-2.5 border border-[#bfc9bd]/50 hover:border-[#004c22] rounded-xl text-xs font-bold text-zinc-500 hover:text-[#004c22] transition-all hover:bg-gray-50/50"
               >
-                <span className="material-symbols-outlined text-sm">content_copy</span>
+                <span className="material-symbols-outlined text-xs">content_copy</span>
               </button>
             </div>
-            
-            <p className="text-xs text-gray-400 text-center">
-              This receipt was cryptographically verified on the Arc Network.
+          )}
+
+          {/* Section 7 — Footer */}
+          <div className="px-8 py-6 text-center space-y-1 select-none">
+            <p className="text-[10px] text-zinc-400 font-medium">
+              Verified receipt &bull; Powered by ArcPay
             </p>
-            <p className="text-xs text-gray-400 text-center">
-              ArcPay &mdash; The paper trail for the Arc Economy.
+            <p className="text-[10px] text-zinc-300 font-mono">
+              arcpaye.com
             </p>
           </div>
+
         </div>
       </div>
     </div>
